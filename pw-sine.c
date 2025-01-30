@@ -16,6 +16,7 @@
 #define DEFAULT_FORMAT SPA_AUDIO_FORMAT_S32
 #define DEFAULT_FREQ 1000
 #define DEFAULT_VOLUME 0.5
+#define DEFAULT_TARGET NULL
 
 struct parameters {
     double freq;
@@ -27,6 +28,7 @@ struct ctx {
     struct pw_stream* stream;
     double accumulator;
     struct parameters params;
+    const char* target;
 };
 
 static void on_process(void* userdata)
@@ -83,7 +85,8 @@ static void show_help(const char* name, bool error)
                                      "  -h, --help                            Show this help\n"
                                      "      --version                         Show version\n"
                                      "  -f, --frequency                       Set frequency\n"
-                                     "  -v, --volume                          Set volume\n",
+                                     "  -v, --volume                          Set volume\n"
+                                     "  -t, --target                          Set node target (node.name or object.serial)\n",
         name);
 }
 
@@ -93,6 +96,7 @@ int main(int argc, char* argv[])
     struct ctx ctx = { 0 };
     const struct spa_pod* params[1];
     uint8_t buffer[1024];
+    enum pw_stream_flags flags = 0;
     struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
 
     static const struct option long_options[] = {
@@ -100,6 +104,7 @@ int main(int argc, char* argv[])
         { "version", no_argument, NULL, 'V' },
         { "frequency", required_argument, NULL, 'f' },
         { "volume", required_argument, NULL, 'v' },
+        { "target", required_argument, NULL, 't' },
         { NULL, 0, NULL, 0 }
     };
 
@@ -108,7 +113,7 @@ int main(int argc, char* argv[])
     ctx.params.freq = DEFAULT_FREQ;
     ctx.params.volume = DEFAULT_VOLUME;
 
-    while ((c = getopt_long(argc, argv, "hVf:v:", long_options, NULL)) != -1) {
+    while ((c = getopt_long(argc, argv, "hVf:v:t:", long_options, NULL)) != -1) {
         switch (c) {
         case 'h':
             show_help(argv[0], false);
@@ -135,6 +140,16 @@ int main(int argc, char* argv[])
             }
             ctx.params.volume = atof(optarg);
             break;
+        case 't':
+            ctx.target = optarg;
+            if (optarg != NULL) {
+                flags |= PW_STREAM_FLAG_AUTOCONNECT;
+            }
+            if (spa_streq(ctx.target, "0")) {
+                ctx.target = NULL;
+                flags &= ~PW_STREAM_FLAG_AUTOCONNECT;
+            }
+            break;
         default:
             show_help(argv[0], true);
             return -1;
@@ -150,6 +165,7 @@ int main(int argc, char* argv[])
             PW_KEY_MEDIA_TYPE, "Audio",
             PW_KEY_MEDIA_CATEGORY, "Playback",
             PW_KEY_MEDIA_ROLE, "Music",
+            PW_KEY_TARGET_OBJECT, ctx.target,
             NULL),
         &stream_events,
         &ctx);
@@ -163,7 +179,7 @@ int main(int argc, char* argv[])
     pw_stream_connect(ctx.stream,
         PW_DIRECTION_OUTPUT,
         PW_ID_ANY,
-        PW_STREAM_FLAG_MAP_BUFFERS | PW_STREAM_FLAG_RT_PROCESS,
+        flags | PW_STREAM_FLAG_MAP_BUFFERS | PW_STREAM_FLAG_RT_PROCESS,
         params, 1);
 
     pw_main_loop_run(ctx.loop);

@@ -12,5 +12,7 @@ Taken from Pipewire tutorial [Part 4: Playing A Tone](https://docs.pipewire.org/
 - `-f` | `--frequency`
     - sine wave frequency
 - `-v` | `--volume`
-    - volume (0.0-1.0)
+    - volume (range 0.0-1.0)
+- `-t` | `--target`
+    - Set node target (node.name or object.serial)
 
